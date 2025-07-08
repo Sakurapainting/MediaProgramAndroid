@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    android:background="#f0f0f0">
+
+    <!-- 标题 -->
+    <TextView
+        android:id="@+id/titleTextView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="智慧融媒体终端"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="#333333"
+        android:gravity="center"
+        android:layout_marginBottom="20dp" />
+
+    <!-- MQTT连接状态 -->
+    <TextView
+        android:id="@+id/statusTextView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/titleTextView"
+        android:text="MQTT连接状态: 未连接"
+        android:textSize="16sp"
+        android:textColor="#666666"
+        android:background="#ffffff"
+        android:padding="12dp"
+        android:layout_marginBottom="16dp" />
+
+    <!-- 设备信息 -->
+    <TextView
+        android:id="@+id/deviceInfoTextView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/statusTextView"
+        android:text="设备信息加载中..."
+        android:textSize="14sp"
+        android:textColor="#666666"
+        android:background="#ffffff"
+        android:padding="12dp"
+        android:layout_marginBottom="20dp" />
+
+    <!-- 控制按钮容器 -->
+    <LinearLayout
+        android:id="@+id/buttonContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/deviceInfoTextView"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="20dp">
+
+        <!-- 连接按钮 -->
+        <Button
+            android:id="@+id/connectButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="连接MQTT"
+            android:textSize="16sp"
+            android:background="#4CAF50"
+            android:textColor="#ffffff"
+            android:layout_marginEnd="8dp" />
+
+        <!-- 断开连接按钮 -->
+        <Button
+            android:id="@+id/disconnectButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="断开连接"
+            android:textSize="16sp"
+            android:background="#f44336"
+            android:textColor="#ffffff"
+            android:layout_marginStart="8dp"
+            android:enabled="false" />
+
+    </LinearLayout>
+
+    <!-- 状态指示器 -->
+    <LinearLayout
+        android:id="@+id/indicatorContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/buttonContainer"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:background="#ffffff"
+        android:padding="16dp">
+
+        <View
+            android:id="@+id/statusIndicator"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:background="#ff9800"
+            android:layout_marginEnd="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="系统状态指示器"
+            android:textSize="14sp"
+            android:textColor="#666666" />
+
+    </LinearLayout>
+
+    <!-- 底部信息 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:text="智慧融媒体云平台 Android 4.4 终端\n版本 1.0.0"
+        android:textSize="12sp"
+        android:textColor="#999999"
+        android:gravity="center"
+        android:padding="16dp" />
+
+</RelativeLayout>

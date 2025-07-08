@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">智慧融媒体终端</string>
+    <string name="mqtt_connecting">正在连接MQTT服务器...</string>
+    <string name="mqtt_connected">MQTT连接成功</string>
+    <string name="mqtt_disconnected">MQTT连接断开</string>
+    <string name="mqtt_error">MQTT连接出错</string>
+    <string name="permission_required">请授予必要权限以正常使用应用</string>
+    <string name="content_playing">正在播放内容</string>
+    <string name="content_error">内容播放出错</string>
+</resources>
