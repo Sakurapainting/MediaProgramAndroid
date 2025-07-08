@@ -52,12 +52,35 @@ public class MqttManager {
     private ContentManager contentManager;
     
     public MqttManager(Context context) {
-        this.context = context;
-        this.configManager = new ConfigManager(context);
-        this.statusManager = new DeviceStatusManager(context);
-        this.contentManager = new ContentManager(context);
-        initializeDevice();
-        setupHeartbeat();
+        try {
+            Log.i(TAG, "MqttManager构造函数开始");
+            this.context = context;
+            
+            Log.i(TAG, "步骤1: 创建ConfigManager");
+            this.configManager = new ConfigManager(context);
+            Log.i(TAG, "ConfigManager创建成功");
+            
+            Log.i(TAG, "步骤2: 创建DeviceStatusManager");
+            this.statusManager = new DeviceStatusManager(context);
+            Log.i(TAG, "DeviceStatusManager创建成功");
+            
+            Log.i(TAG, "步骤3: 创建ContentManager");
+            this.contentManager = new ContentManager(context);
+            Log.i(TAG, "ContentManager创建成功");
+            
+            Log.i(TAG, "步骤4: 初始化设备信息");
+            initializeDevice();
+            Log.i(TAG, "设备信息初始化成功");
+            
+            Log.i(TAG, "步骤5: 设置心跳");
+            setupHeartbeat();
+            Log.i(TAG, "心跳设置成功");
+            
+            Log.i(TAG, "MqttManager构造函数完成");
+        } catch (Exception e) {
+            Log.e(TAG, "MqttManager构造函数异常", e);
+            throw e; // 重新抛出异常，让上层知道初始化失败
+        }
     }
     
     /**

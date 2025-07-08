@@ -12,6 +12,7 @@ public class MediaApplication extends Application {
     
     private static MediaApplication instance;
     private MqttManager mqttManager;
+    private SimpleMqttManager simpleMqttManager; // 调试用的简化版本
     
     @Override
     public void onCreate() {
@@ -43,17 +44,37 @@ public class MediaApplication extends Application {
         return instance.getApplicationContext();
     }
     
-    public MqttManager getMqttManager() {
-        if (mqttManager == null) {
-            try {
-                Log.i("MediaApplication", "延迟初始化MQTT管理器");
-                mqttManager = new MqttManager(this);
-                Log.i("MediaApplication", "MQTT管理器初始化完成");
-            } catch (Exception e) {
-                Log.e("MediaApplication", "MQTT管理器初始化失败", e);
-                return null;
-            }
+    public Object getMqttManager() {
+        // 返回一个模拟对象，避免真正的MqttManager构造函数
+        return new MockMqttManager();
+    }
+    
+    /**
+     * 模拟的MQTT管理器类
+     */
+    public static class MockMqttManager {
+        private boolean connected = false;
+        
+        public void connect() {
+            Log.i("MediaApplication", "模拟MQTT连接");
+            connected = true;
         }
-        return mqttManager;
+        
+        public void disconnect() {
+            Log.i("MediaApplication", "模拟MQTT断开");
+            connected = false;
+        }
+        
+        public boolean isConnected() {
+            return connected;
+        }
+        
+        public String getDeviceId() {
+            return "debug_device_001";
+        }
+        
+        public String getClientId() {
+            return "debug_client_001";
+        }
     }
 }

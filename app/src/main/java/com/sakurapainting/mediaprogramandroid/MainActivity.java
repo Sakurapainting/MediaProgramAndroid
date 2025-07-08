@@ -23,7 +23,7 @@ public class MainActivity extends AppCompatActivity {
     private Button connectButton;
     private Button disconnectButton;
     
-    private MqttManager mqttManager;
+    private Object mqttManager; // 临时改为Object，用于调试
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -185,7 +185,8 @@ public class MainActivity extends AppCompatActivity {
             Log.i(TAG, "连接按钮被点击");
             
             if (mqttManager != null) {
-                mqttManager.connect();
+                // 使用反射调用connect方法
+                mqttManager.getClass().getMethod("connect").invoke(mqttManager);
                 Toast.makeText(this, "正在连接MQTT服务器...", Toast.LENGTH_SHORT).show();
                 updateConnectionUI();
             } else {
@@ -207,7 +208,8 @@ public class MainActivity extends AppCompatActivity {
             Log.i(TAG, "断开连接按钮被点击");
             
             if (mqttManager != null) {
-                mqttManager.disconnect();
+                // 使用反射调用disconnect方法
+                mqttManager.getClass().getMethod("disconnect").invoke(mqttManager);
                 Toast.makeText(this, "已断开MQTT连接", Toast.LENGTH_SHORT).show();
                 updateConnectionUI();
             }
@@ -227,11 +229,15 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             
-            boolean isConnected = mqttManager.isConnected();
+            // 使用反射调用方法
+            boolean isConnected = (Boolean) mqttManager.getClass().getMethod("isConnected").invoke(mqttManager);
+            String deviceId = (String) mqttManager.getClass().getMethod("getDeviceId").invoke(mqttManager);
+            String clientId = (String) mqttManager.getClass().getMethod("getClientId").invoke(mqttManager);
+            
             String statusText = String.format("MQTT连接状态: %s\n设备ID: %s\n客户端ID: %s",
                     isConnected ? "✅ 已连接" : "❌ 未连接",
-                    mqttManager.getDeviceId() != null ? mqttManager.getDeviceId() : "未知",
-                    mqttManager.getClientId() != null ? mqttManager.getClientId() : "未知");
+                    deviceId != null ? deviceId : "未知",
+                    clientId != null ? clientId : "未知");
             
             if (statusTextView != null) {
                 statusTextView.setText(statusText);
@@ -274,7 +280,8 @@ public class MainActivity extends AppCompatActivity {
             Log.i(TAG, "MainActivity onDestroy");
             
             if (mqttManager != null) {
-                mqttManager.disconnect();
+                // 使用反射调用disconnect方法
+                mqttManager.getClass().getMethod("disconnect").invoke(mqttManager);
             }
             
         } catch (Exception e) {
