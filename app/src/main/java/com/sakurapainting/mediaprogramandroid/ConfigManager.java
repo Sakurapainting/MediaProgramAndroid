@@ -21,8 +21,8 @@ public class ConfigManager {
     private static final String KEY_RECONNECT_DELAY = "reconnect_delay";
     
     // 默认值
-    private static final String DEFAULT_MQTT_SERVER = "10.0.2.2"; // 模拟器默认主机IP
-    private static final int DEFAULT_MQTT_PORT = 1884;
+    private static final String DEFAULT_MQTT_SERVER = "192.168.13.217"; // 模拟器默认主机IP
+    private static final int DEFAULT_MQTT_PORT = 1883;
     private static final boolean DEFAULT_AUTO_CONNECT = true;
     private static final int DEFAULT_HEARTBEAT_INTERVAL = 30; // 秒
     private static final int DEFAULT_RECONNECT_DELAY = 5; // 秒
