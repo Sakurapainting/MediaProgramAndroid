@@ -143,10 +143,15 @@ public class MqttManager {
         try {
             // 创建MQTT客户端
             String mqttUrl = configManager.getMqttUrl();
+            Log.i(TAG, "=== 开始MQTT连接流程 ===");
+            Log.i(TAG, "MQTT URL: " + mqttUrl);
+            Log.i(TAG, "客户端ID: " + clientId);
+            Log.i(TAG, "设备ID: " + deviceId);
+            
             mqttClient = new MqttAndroidClient(context, mqttUrl, clientId);
             mqttClient.setCallback(new MqttCallbackHandler());
             
-            Log.i(TAG, "连接到MQTT服务器: " + mqttUrl);
+            Log.i(TAG, "MqttAndroidClient 创建成功，开始连接...");
             
             // 连接选项
             MqttConnectOptions options = new MqttConnectOptions();
@@ -159,7 +164,10 @@ public class MqttManager {
             mqttClient.connect(options, new IMqttActionListener() {
                 @Override
                 public void onSuccess(IMqttToken asyncActionToken) {
-                    Log.i(TAG, "MQTT连接成功");
+                    Log.i(TAG, "🎉 MQTT连接成功！");
+                    Log.i(TAG, "服务器地址: " + configManager.getMqttUrl());
+                    Log.i(TAG, "设备ID: " + deviceId);
+                    Log.i(TAG, "客户端ID: " + clientId);
                     isConnected = true;
                     subscribeToTopics();
                     registerDevice();
@@ -169,16 +177,29 @@ public class MqttManager {
                 
                 @Override
                 public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
-                    Log.e(TAG, "MQTT连接失败", exception);
+                    Log.e(TAG, "❌ MQTT连接失败");
+                    Log.e(TAG, "服务器地址: " + configManager.getMqttUrl());
+                    Log.e(TAG, "错误详情: " + (exception != null ? exception.getMessage() : "unknown"));
+                    if (exception != null) {
+                        Log.e(TAG, "异常类型: " + exception.getClass().getSimpleName());
+                        exception.printStackTrace();
+                    }
                     isConnected = false;
                     // 延迟重试
                     int delay = configManager.getReconnectDelay() * 1000;
+                    Log.i(TAG, "将在 " + delay + "ms 后重试连接");
                     new Handler(Looper.getMainLooper()).postDelayed(() -> connect(), delay);
                 }
             });
             
         } catch (MqttException e) {
-            Log.e(TAG, "创建MQTT客户端失败", e);
+            Log.e(TAG, "❌ 创建MQTT客户端失败");
+            Log.e(TAG, "MQTT异常代码: " + e.getReasonCode());
+            Log.e(TAG, "MQTT异常消息: " + e.getMessage());
+            e.printStackTrace();
+        } catch (Exception e) {
+            Log.e(TAG, "❌ 其他异常: " + e.getMessage());
+            e.printStackTrace();
         }
     }
     

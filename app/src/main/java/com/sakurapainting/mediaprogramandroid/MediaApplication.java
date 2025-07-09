@@ -45,8 +45,21 @@ public class MediaApplication extends Application {
     }
     
     public Object getMqttManager() {
-        // 返回一个模拟对象，避免真正的MqttManager构造函数
-        return new MockMqttManager();
+        try {
+            // 尝试使用真实的MQTT管理器
+            if (mqttManager == null) {
+                Log.i("MediaApplication", "创建真实的MqttManager");
+                mqttManager = new MqttManager(this);
+            }
+            return mqttManager;
+        } catch (Exception e) {
+            Log.e("MediaApplication", "创建真实MqttManager失败，使用简化版本", e);
+            // 如果真实的失败了，使用简化版本
+            if (simpleMqttManager == null) {
+                simpleMqttManager = new SimpleMqttManager(this);
+            }
+            return simpleMqttManager;
+        }
     }
     
     /**
