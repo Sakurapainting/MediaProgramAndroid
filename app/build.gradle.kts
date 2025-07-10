@@ -45,7 +45,6 @@ dependencies {
     
     // MQTT客户端库 - Paho Android
     implementation("org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5")
-    implementation("org.eclipse.paho:org.eclipse.paho.android.service:1.1.1")
     
     // JSON处理 - 使用Android系统自带的org.json
     // implementation("org.json:json:20210307") // 注释掉，使用系统自带

@@ -1,7 +1,6 @@
 package com.sakurapainting.mediaprogramandroid;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Handler;
@@ -9,14 +8,13 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.util.Log;
 
-import org.eclipse.paho.android.service.MqttAndroidClient;
-import org.eclipse.paho.client.mqttv3.IMqttActionListener;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
-import org.eclipse.paho.client.mqttv3.IMqttToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
+import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -25,12 +23,9 @@ import org.json.JSONObject;
  * 负责与云平台的MQTT通信
  */
 public class MqttManager {
-    
     private static final String TAG = "MqttManager";
-    
     // MQTT配置
     private ConfigManager configManager;
-    
     // 主题定义
     private static final String TOPIC_REGISTER = "device/register";
     private static final String TOPIC_HEARTBEAT = "device/heartbeat";
@@ -40,9 +35,8 @@ public class MqttManager {
     private static final String TOPIC_CONTENT = "device/%s/content";
     private static final String TOPIC_COMMANDS = "device/%s/commands";
     private static final String TOPIC_BROADCAST = "broadcast/all";
-    
     private Context context;
-    private MqttAndroidClient mqttClient;
+    private MqttClient mqttClient;
     private String deviceId;
     private String clientId;
     private boolean isConnected = false;
@@ -50,39 +44,33 @@ public class MqttManager {
     private Runnable heartbeatRunnable;
     private DeviceStatusManager statusManager;
     private ContentManager contentManager;
-    
+
     public MqttManager(Context context) {
         try {
             Log.i(TAG, "MqttManager构造函数开始");
             this.context = context;
-            
             Log.i(TAG, "步骤1: 创建ConfigManager");
             this.configManager = new ConfigManager(context);
             Log.i(TAG, "ConfigManager创建成功");
-            
             Log.i(TAG, "步骤2: 创建DeviceStatusManager");
             this.statusManager = new DeviceStatusManager(context);
             Log.i(TAG, "DeviceStatusManager创建成功");
-            
             Log.i(TAG, "步骤3: 创建ContentManager");
             this.contentManager = new ContentManager(context);
             Log.i(TAG, "ContentManager创建成功");
-            
             Log.i(TAG, "步骤4: 初始化设备信息");
             initializeDevice();
             Log.i(TAG, "设备信息初始化成功");
-            
             Log.i(TAG, "步骤5: 设置心跳");
             setupHeartbeat();
             Log.i(TAG, "心跳设置成功");
-            
             Log.i(TAG, "MqttManager构造函数完成");
         } catch (Exception e) {
             Log.e(TAG, "MqttManager构造函数异常", e);
-            throw e; // 重新抛出异常，让上层知道初始化失败
+            throw e;
         }
     }
-    
+
     /**
      * 初始化设备信息 - Android 4.4兼容版本
      */
@@ -97,7 +85,7 @@ public class MqttManager {
                 } catch (Exception e) {
                     Log.w(TAG, "无法获取ANDROID_ID", e);
                 }
-                
+
                 if (androidId != null && androidId.length() > 0 && !"9774d56d682e549c".equals(androidId)) {
                     // 正常的ANDROID_ID
                     deviceId = "android_" + androidId.substring(Math.max(0, androidId.length() - 8));
@@ -109,14 +97,14 @@ public class MqttManager {
                 }
                 configManager.setDeviceId(deviceId);
             }
-            
+
             // 生成客户端ID
             clientId = configManager.getClientId();
             if (clientId == null) {
                 clientId = "mqtt_client_" + deviceId.substring("android_".length());
                 configManager.setClientId(clientId);
             }
-            
+
             Log.i(TAG, "Device ID: " + deviceId + ", Client ID: " + clientId);
         } catch (Exception e) {
             Log.e(TAG, "初始化设备信息异常", e);
@@ -125,84 +113,85 @@ public class MqttManager {
             clientId = "mqtt_client_default";
         }
     }
-    
+
     /**
      * 连接到MQTT服务器
      */
     public void connect() {
         if (mqttClient != null && mqttClient.isConnected()) {
-            Log.w(TAG, "MQTT already connected");
-            return;
+            Log.w(TAG, "MQTT already connected, checking real status...");
+            try {
+                Log.i(TAG, "验证现有连接状态...");
+                return;
+            } catch (Exception e) {
+                Log.w(TAG, "现有连接无效，将重新连接: " + e.getMessage());
+                try {
+                    mqttClient.disconnect();
+                    mqttClient.close();
+                } catch (Exception ex) {
+                    Log.w(TAG, "清理连接时异常: " + ex.getMessage());
+                }
+                mqttClient = null;
+                isConnected = false;
+            }
         }
-        
         if (!isNetworkAvailable()) {
             Log.w(TAG, "Network not available");
             return;
         }
-        
-        try {
-            // 创建MQTT客户端
-            String mqttUrl = configManager.getMqttUrl();
-            Log.i(TAG, "=== 开始MQTT连接流程 ===");
-            Log.i(TAG, "MQTT URL: " + mqttUrl);
-            Log.i(TAG, "客户端ID: " + clientId);
-            Log.i(TAG, "设备ID: " + deviceId);
-            
-            mqttClient = new MqttAndroidClient(context, mqttUrl, clientId);
-            mqttClient.setCallback(new MqttCallbackHandler());
-            
-            Log.i(TAG, "MqttAndroidClient 创建成功，开始连接...");
-            
-            // 连接选项
-            MqttConnectOptions options = new MqttConnectOptions();
-            options.setAutomaticReconnect(true);
-            options.setCleanSession(false);
-            options.setConnectionTimeout(30);
-            options.setKeepAliveInterval(60);
-            
-            // 连接
-            mqttClient.connect(options, new IMqttActionListener() {
-                @Override
-                public void onSuccess(IMqttToken asyncActionToken) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String mqttUrl = configManager.getMqttUrl();
+                    Log.i(TAG, "=== 开始MQTT连接流程 ===");
+                    Log.i(TAG, "MQTT URL: " + mqttUrl);
+                    Log.i(TAG, "客户端ID: " + clientId);
+                    Log.i(TAG, "设备ID: " + deviceId);
+                    MemoryPersistence persistence = new MemoryPersistence();
+                    mqttClient = new MqttClient(mqttUrl, clientId, persistence);
+                    mqttClient.setCallback(new MqttCallbackHandler());
+                    Log.i(TAG, "MqttClient 创建成功，开始连接...");
+                    MqttConnectOptions options = new MqttConnectOptions();
+                    options.setAutomaticReconnect(true);
+                    options.setCleanSession(true);
+                    options.setConnectionTimeout(10);
+                    options.setKeepAliveInterval(30);
+                    mqttClient.connect(options);
                     Log.i(TAG, "🎉 MQTT连接成功！");
                     Log.i(TAG, "服务器地址: " + configManager.getMqttUrl());
                     Log.i(TAG, "设备ID: " + deviceId);
                     Log.i(TAG, "客户端ID: " + clientId);
+                    Log.i(TAG, "isConnected标志已设置为: " + isConnected);
                     isConnected = true;
                     subscribeToTopics();
                     registerDevice();
                     startHeartbeat();
                     updateStatus("online");
-                }
-                
-                @Override
-                public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
+                } catch (MqttException e) {
                     Log.e(TAG, "❌ MQTT连接失败");
                     Log.e(TAG, "服务器地址: " + configManager.getMqttUrl());
-                    Log.e(TAG, "错误详情: " + (exception != null ? exception.getMessage() : "unknown"));
-                    if (exception != null) {
-                        Log.e(TAG, "异常类型: " + exception.getClass().getSimpleName());
-                        exception.printStackTrace();
-                    }
+                    Log.e(TAG, "MQTT异常代码: " + e.getReasonCode());
+                    Log.e(TAG, "MQTT异常消息: " + e.getMessage());
+                    e.printStackTrace();
                     isConnected = false;
-                    // 延迟重试
                     int delay = configManager.getReconnectDelay() * 1000;
                     Log.i(TAG, "将在 " + delay + "ms 后重试连接");
-                    new Handler(Looper.getMainLooper()).postDelayed(() -> connect(), delay);
+                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            connect();
+                        }
+                    }, delay);
+                } catch (Exception e) {
+                    Log.e(TAG, "❌ 其他异常: " + e.getMessage());
+                    e.printStackTrace();
+                    isConnected = false;
                 }
-            });
-            
-        } catch (MqttException e) {
-            Log.e(TAG, "❌ 创建MQTT客户端失败");
-            Log.e(TAG, "MQTT异常代码: " + e.getReasonCode());
-            Log.e(TAG, "MQTT异常消息: " + e.getMessage());
-            e.printStackTrace();
-        } catch (Exception e) {
-            Log.e(TAG, "❌ 其他异常: " + e.getMessage());
-            e.printStackTrace();
-        }
+            }
+        }).start();
     }
-    
+
     /**
      * 订阅相关主题
      */
@@ -212,21 +201,21 @@ public class MqttManager {
             String contentTopic = String.format(TOPIC_CONTENT, clientId);
             mqttClient.subscribe(contentTopic, 1);
             Log.i(TAG, "订阅主题: " + contentTopic);
-            
+
             // 订阅命令主题
             String commandTopic = String.format(TOPIC_COMMANDS, clientId);
             mqttClient.subscribe(commandTopic, 1);
             Log.i(TAG, "订阅主题: " + commandTopic);
-            
+
             // 订阅广播主题
             mqttClient.subscribe(TOPIC_BROADCAST, 1);
             Log.i(TAG, "订阅主题: " + TOPIC_BROADCAST);
-            
+
         } catch (MqttException e) {
             Log.e(TAG, "订阅主题失败", e);
         }
     }
-    
+
     /**
      * 注册设备
      */
@@ -237,12 +226,12 @@ public class MqttManager {
             message.put("deviceId", deviceId);
             message.put("clientId", clientId);
             message.put("timestamp", System.currentTimeMillis());
-            
+
             JSONObject data = new JSONObject();
             data.put("deviceId", deviceId);
             data.put("name", "安卓屏幕终端_" + deviceId.substring("android_".length()));
             data.put("type", "android_screen");
-            
+
             // 位置信息
             JSONObject location = new JSONObject();
             location.put("name", "移动显示终端");
@@ -252,48 +241,48 @@ public class MqttManager {
             coordinates.put("longitude", 0.0);
             location.put("coordinates", coordinates);
             data.put("location", location);
-            
+
             // 设备规格
             JSONObject specs = statusManager.getDeviceSpecifications();
             data.put("specifications", specs);
-            
+
             data.put("version", "1.0.0");
             data.put("capabilities", new String[]{"display", "audio", "touch"});
-            
+
             message.put("data", data);
-            
+
             publishMessage(TOPIC_REGISTER, message.toString());
             Log.i(TAG, "设备注册消息已发送");
-            
+
         } catch (JSONException e) {
             Log.e(TAG, "创建注册消息失败", e);
         }
     }
-    
+
     /**
      * 发送心跳消息
      */
     private void sendHeartbeat() {
         if (!isConnected) return;
-        
+
         try {
             JSONObject message = new JSONObject();
             message.put("type", "heartbeat");
             message.put("deviceId", deviceId);
             message.put("clientId", clientId);
             message.put("timestamp", System.currentTimeMillis());
-            
+
             JSONObject data = statusManager.getSystemStatus();
             message.put("data", data);
-            
+
             publishMessage(TOPIC_HEARTBEAT, message.toString());
             Log.d(TAG, "心跳消息已发送");
-            
+
         } catch (JSONException e) {
             Log.e(TAG, "创建心跳消息失败", e);
         }
     }
-    
+
     /**
      * 更新设备状态
      */
@@ -304,20 +293,20 @@ public class MqttManager {
             message.put("deviceId", deviceId);
             message.put("clientId", clientId);
             message.put("timestamp", System.currentTimeMillis());
-            
+
             JSONObject data = new JSONObject();
             data.put("status", status);
             data.put("deviceInfo", statusManager.getDeviceInfo());
             message.put("data", data);
-            
+
             publishMessage(TOPIC_STATUS, message.toString());
             Log.i(TAG, "状态更新消息已发送: " + status);
-            
+
         } catch (JSONException e) {
             Log.e(TAG, "创建状态消息失败", e);
         }
     }
-    
+
     /**
      * 发布消息
      */
@@ -326,20 +315,20 @@ public class MqttManager {
             Log.w(TAG, "MQTT未连接，无法发送消息");
             return;
         }
-        
+
         try {
             MqttMessage mqttMessage = new MqttMessage(message.getBytes());
             mqttMessage.setQos(1);
             mqttMessage.setRetained(false);
-            
+
             mqttClient.publish(topic, mqttMessage);
             Log.d(TAG, "消息已发布到 " + topic + ": " + message);
-            
+
         } catch (MqttException e) {
             Log.e(TAG, "发布消息失败", e);
         }
     }
-    
+
     /**
      * 设置心跳
      */
@@ -354,7 +343,7 @@ public class MqttManager {
             }
         };
     }
-    
+
     /**
      * 开始心跳
      */
@@ -362,7 +351,7 @@ public class MqttManager {
         stopHeartbeat();
         heartbeatHandler.post(heartbeatRunnable);
     }
-    
+
     /**
      * 停止心跳
      */
@@ -371,7 +360,7 @@ public class MqttManager {
             heartbeatHandler.removeCallbacks(heartbeatRunnable);
         }
     }
-    
+
     /**
      * 检查网络连接
      */
@@ -380,13 +369,13 @@ public class MqttManager {
         NetworkInfo networkInfo = cm.getActiveNetworkInfo();
         return networkInfo != null && networkInfo.isConnected();
     }
-    
+
     /**
      * 断开连接
      */
     public void disconnect() {
         stopHeartbeat();
-        
+
         if (mqttClient != null && mqttClient.isConnected()) {
             try {
                 updateStatus("offline");
@@ -396,35 +385,35 @@ public class MqttManager {
                 Log.e(TAG, "断开MQTT连接失败", e);
             }
         }
-        
+
         isConnected = false;
     }
-    
+
     /**
      * MQTT回调处理器
      */
     private class MqttCallbackHandler implements MqttCallback {
-        
+
         @Override
         public void connectionLost(Throwable cause) {
             Log.w(TAG, "MQTT连接丢失", cause);
             isConnected = false;
             stopHeartbeat();
-            
+
             // 延迟重连
             int delay = configManager.getReconnectDelay() * 1000;
             new Handler(Looper.getMainLooper()).postDelayed(() -> connect(), delay);
         }
-        
+
         @Override
         public void messageArrived(String topic, MqttMessage message) throws Exception {
             String payload = new String(message.getPayload());
             Log.i(TAG, "收到消息 - 主题: " + topic + ", 内容: " + payload);
-            
+
             try {
                 JSONObject jsonMessage = new JSONObject(payload);
                 String type = jsonMessage.optString("type");
-                
+
                 if (topic.endsWith("/content")) {
                     // 处理内容推送
                     handleContentPush(jsonMessage);
@@ -435,18 +424,18 @@ public class MqttManager {
                     // 处理广播消息
                     handleBroadcast(jsonMessage);
                 }
-                
+
             } catch (JSONException e) {
                 Log.e(TAG, "解析消息失败", e);
             }
         }
-        
+
         @Override
         public void deliveryComplete(IMqttDeliveryToken token) {
             Log.d(TAG, "消息发送完成");
         }
     }
-    
+
     /**
      * 处理内容推送
      */
@@ -459,7 +448,7 @@ public class MqttManager {
             }
         });
     }
-    
+
     /**
      * 处理命令
      */
@@ -467,9 +456,9 @@ public class MqttManager {
         try {
             JSONObject data = message.getJSONObject("data");
             String command = data.getString("command");
-            
+
             Log.i(TAG, "处理命令: " + command);
-            
+
             switch (command) {
                 case "screenshot":
                     handleScreenshotCommand(data);
@@ -483,12 +472,12 @@ public class MqttManager {
                 default:
                     Log.w(TAG, "未知命令: " + command);
             }
-            
+
         } catch (JSONException e) {
             Log.e(TAG, "处理命令失败", e);
         }
     }
-    
+
     /**
      * 处理广播消息
      */
@@ -497,17 +486,17 @@ public class MqttManager {
             JSONObject data = message.getJSONObject("data");
             String broadcastMessage = data.getString("message");
             String level = data.optString("level", "info");
-            
+
             Log.i(TAG, "收到广播消息: " + broadcastMessage + " (级别: " + level + ")");
-            
+
             // 在主活动中显示广播消息（如果需要）
             // 这里可以发送广播Intent给MainActivity
-            
+
         } catch (JSONException e) {
             Log.e(TAG, "处理广播消息失败", e);
         }
     }
-    
+
     /**
      * 处理截图命令
      */
@@ -516,7 +505,7 @@ public class MqttManager {
         // 由于Android 4.4的限制，需要root权限或特殊方法
         Log.i(TAG, "截图功能需要特殊权限，当前版本暂不支持");
     }
-    
+
     /**
      * 处理重启命令
      */
@@ -527,7 +516,7 @@ public class MqttManager {
             android.os.Process.killProcess(android.os.Process.myPid());
         }, 1000);
     }
-    
+
     /**
      * 发送内容响应
      */
@@ -538,7 +527,7 @@ public class MqttManager {
             message.put("deviceId", deviceId);
             message.put("clientId", clientId);
             message.put("timestamp", System.currentTimeMillis());
-            
+
             JSONObject data = new JSONObject();
             data.put("contentId", contentId);
             data.put("status", status);
@@ -548,24 +537,24 @@ public class MqttManager {
                 data.put("error", JSONObject.NULL);
             }
             message.put("data", data);
-            
+
             publishMessage(TOPIC_CONTENT_RESPONSE, message.toString());
             Log.i(TAG, "内容响应已发送: " + status);
-            
+
         } catch (JSONException e) {
             Log.e(TAG, "创建内容响应失败", e);
         }
     }
-    
+
     // Getter方法
     public boolean isConnected() {
         return isConnected && mqttClient != null && mqttClient.isConnected();
     }
-    
+
     public String getDeviceId() {
         return deviceId;
     }
-    
+
     public String getClientId() {
         return clientId;
     }
