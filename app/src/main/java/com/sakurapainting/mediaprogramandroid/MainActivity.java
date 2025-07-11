@@ -1,5 +1,7 @@
 package com.sakurapainting.mediaprogramandroid;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -9,6 +11,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 /**
  * 主Activity - 最简化的Android 4.4兼容版本
@@ -17,6 +21,7 @@ import androidx.appcompat.app.AppCompatActivity;
 public class MainActivity extends AppCompatActivity {
     
     private static final String TAG = "MainActivity";
+    private static final int PERMISSION_REQUEST_CODE = 1001;
     
     private TextView statusTextView;
     private TextView deviceInfoTextView;
@@ -47,7 +52,11 @@ public class MainActivity extends AppCompatActivity {
             initBasicViews();
             Log.i(TAG, "基本视图初始化成功");
             
-            // 步骤4：显示启动状态
+            // 步骤4：检查并请求权限
+            Log.i(TAG, "步骤4：检查并请求权限");
+            checkAndRequestPermissions();
+            
+            // 步骤5：显示启动状态
             if (statusTextView != null) {
                 statusTextView.setText("应用启动成功\nAndroid " + Build.VERSION.RELEASE + " (API " + Build.VERSION.SDK_INT + ")");
             }
@@ -60,8 +69,8 @@ public class MainActivity extends AppCompatActivity {
                 deviceInfoTextView.setText(deviceInfo);
             }
             
-            // 步骤5：延迟初始化MQTT（非关键）
-            Log.i(TAG, "步骤5：计划延迟初始化MQTT");
+            // 步骤6：延迟初始化MQTT（非关键）
+            Log.i(TAG, "步骤6：计划延迟初始化MQTT");
             scheduleDelayedMqttInit();
             
             Log.i(TAG, "=== MainActivity onCreate 完成 ===");
@@ -309,6 +318,66 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "MainActivity onPause");
         } catch (Exception e) {
             Log.e(TAG, "onPause异常", e);
+        }
+    }
+    
+    /**
+     * 检查并请求必要权限
+     */
+    private void checkAndRequestPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            String[] permissions = {
+                Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            };
+            
+            boolean needRequest = false;
+            for (String permission : permissions) {
+                if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+                    needRequest = true;
+                    break;
+                }
+            }
+            
+            if (needRequest) {
+                Log.i(TAG, "请求存储权限");
+                ActivityCompat.requestPermissions(this, permissions, PERMISSION_REQUEST_CODE);
+            } else {
+                Log.i(TAG, "存储权限已授予");
+            }
+        } else {
+            Log.i(TAG, "Android版本低于6.0，无需动态请求权限");
+        }
+    }
+    
+    /**
+     * 权限请求结果回调
+     */
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            boolean allGranted = true;
+            StringBuilder deniedPermissions = new StringBuilder();
+            
+            for (int i = 0; i < permissions.length; i++) {
+                if (grantResults[i] != PackageManager.PERMISSION_GRANTED) {
+                    allGranted = false;
+                    if (deniedPermissions.length() > 0) {
+                        deniedPermissions.append(", ");
+                    }
+                    deniedPermissions.append(permissions[i]);
+                }
+            }
+            
+            if (allGranted) {
+                Log.i(TAG, "所有权限已授予");
+                Toast.makeText(this, "权限授予成功", Toast.LENGTH_SHORT).show();
+            } else {
+                Log.w(TAG, "部分权限被拒绝: " + deniedPermissions.toString());
+                Toast.makeText(this, "部分权限被拒绝，可能影响文件下载功能", Toast.LENGTH_LONG).show();
+            }
         }
     }
 }

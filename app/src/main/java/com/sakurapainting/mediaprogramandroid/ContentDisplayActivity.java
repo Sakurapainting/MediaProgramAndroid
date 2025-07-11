@@ -235,7 +235,25 @@ public class ContentDisplayActivity extends Activity {
         videoView.setVisibility(View.VISIBLE);
         
         try {
-            Uri videoUri = Uri.parse(url);
+            Uri videoUri;
+            
+            // 判断是本地文件还是网络URL
+            if (url.startsWith("http://") || url.startsWith("https://")) {
+                // 网络URL
+                videoUri = Uri.parse(url);
+                Log.i(TAG, "播放网络视频: " + url);
+            } else {
+                // 本地文件路径
+                java.io.File videoFile = new java.io.File(url);
+                if (!videoFile.exists()) {
+                    Log.e(TAG, "本地视频文件不存在: " + url);
+                    finish();
+                    return;
+                }
+                videoUri = Uri.fromFile(videoFile);
+                Log.i(TAG, "播放本地视频: " + url);
+            }
+            
             videoView.setVideoURI(videoUri);
             
             // 设置媒体控制器（可选）
@@ -249,6 +267,9 @@ public class ContentDisplayActivity extends Activity {
                 public void onPrepared(MediaPlayer mp) {
                     Log.i(TAG, "视频准备完成，开始播放");
                     videoView.start();
+                    
+                    // 设置视频尺寸适应
+                    mp.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING);
                 }
             });
             
@@ -263,7 +284,22 @@ public class ContentDisplayActivity extends Activity {
             videoView.setOnErrorListener(new MediaPlayer.OnErrorListener() {
                 @Override
                 public boolean onError(MediaPlayer mp, int what, int extra) {
-                    Log.e(TAG, "视频播放错误: " + what + ", " + extra);
+                    Log.e(TAG, "视频播放错误: what=" + what + ", extra=" + extra);
+                    
+                    // 提供更详细的错误信息
+                    String errorMsg = "视频播放错误";
+                    switch (what) {
+                        case MediaPlayer.MEDIA_ERROR_UNKNOWN:
+                            errorMsg += " - 未知错误";
+                            break;
+                        case MediaPlayer.MEDIA_ERROR_SERVER_DIED:
+                            errorMsg += " - 服务器错误";
+                            break;
+                        default:
+                            errorMsg += " - 错误代码: " + what;
+                    }
+                    
+                    Log.e(TAG, errorMsg);
                     finish();
                     return true;
                 }
